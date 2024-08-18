@@ -18,7 +18,13 @@
 
 ## ucontext族函数
 
-正式开始编写协程库前，需要了解Linux下的ucontext族函数，并基于函数实现一个简单的协程库。
+正式开始编写协程库前，需要了解 Linux 下的 ucontext 族函数，并基于函数实现一个简单的协程库。
 
 1. [ucontext-人人都可以实现的简单协程库](https://developer.aliyun.com/article/52886)
 2. [代码实现](src/uthread)
+
+
+## 待实现
+
+1. hook 模块
+2. 把 coroutine library 放到 WebServer 里
