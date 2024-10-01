@@ -20,6 +20,8 @@
 ## 独立栈和共享栈的实现
 
 1. [独立栈的实现](src/independentStack)
+2. [共享栈的实现](src/sharedStack)
+3. [参考](https://cloud.tencent.com/developer/article/1945309)
 
 ## ucontext族函数
 
