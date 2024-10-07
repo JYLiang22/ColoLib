@@ -1,31 +1,34 @@
 /*
  * @file fiber.cpp
- * @brief Ğ­³ÌÊµÏÖ
+ * @brief åç¨‹å®ç°
  * @date 2024.6.13
  * @cite https://github.com/zhongluqiang/sylar-from-scratch/blob/main/sylar/fiber.cc
 */
 
+#include<iostream>
+#include<stdio.h>
 #include<atomic>
 #include<assert.h>
+#include<scheduler.h>
 #include"fiber.h"
 
 namespace coro{
 
-/// È«¾Ö¾²Ì¬±äÁ¿£¬ÓÃÓÚÉú³ÉĞ­³Ìid
+/// å…¨å±€é™æ€å˜é‡ï¼Œç”¨äºç”Ÿæˆåç¨‹id
 static std::atomic<uint64_t> s_fiber_id{0};
-/// È«¾Ö¾²Ì¬±äÁ¿£¬ÓÃÓÚÍ³¼Æµ±Ç°Ğ­³ÌÊı
+/// å…¨å±€é™æ€å˜é‡ï¼Œç”¨äºç»Ÿè®¡å½“å‰åç¨‹æ•°
 static std::atomic<uint64_t> s_fiber_count{0};
 
-/// Ïß³Ì¾Ö²¿±äÁ¿£¬µ±Ç°Ïß³ÌÕıÔÚÔËĞĞµÄĞ­³Ì
+/// çº¿ç¨‹å±€éƒ¨å˜é‡ï¼Œå½“å‰çº¿ç¨‹æ­£åœ¨è¿è¡Œçš„åç¨‹
 static thread_local Fiber *t_fiber = nullptr;
-/// Ïß³Ì¾Ö²¿±äÁ¿£¬µ±Ç°Ïß³ÌµÄÖ÷Ğ­³Ì£¬ÇĞ»»µ½Õâ¸öĞ­³Ì£¬¾ÍÏàµ±ÓÚÇĞ»»µ½ÁËÖ÷Ïß³ÌÖĞÔËĞĞ£¬ÖÇÄÜÖ¸ÕëĞÎÊ½
+/// çº¿ç¨‹å±€éƒ¨å˜é‡ï¼Œå½“å‰çº¿ç¨‹çš„ä¸»åç¨‹ï¼Œåˆ‡æ¢åˆ°è¿™ä¸ªåç¨‹ï¼Œå°±ç›¸å½“äºåˆ‡æ¢åˆ°äº†ä¸»çº¿ç¨‹ä¸­è¿è¡Œï¼Œæ™ºèƒ½æŒ‡é’ˆå½¢å¼
 static thread_local Fiber::ptr t_thread_fiber = nullptr;
 
-/// ¶¨ÒåÄ¬ÈÏÕ»¿Õ¼äÎª128K
+/// å®šä¹‰é»˜è®¤æ ˆç©ºé—´ä¸º128KB
 #define DEFAULT_STACK_SIZE (1024*128)
 
 /*
- * @brief mallocÕ»ÄÚ´æ·ÖÅäÆ÷
+ * @brief mallocæ ˆå†…å­˜åˆ†é…å™¨
 */
 class MallocStackAllocator{
 public:
@@ -47,15 +50,15 @@ Fiber::Fiber(){
     m_state = RUNNING;
 
     if(getcontext(&m_ctx)){
-        /// ÏÈ²»ÓÃlogÈÕÖ¾Ä£¿é£¬ÔõÃ´·½±ãÔõÃ´À´
-        printf("Fiber::Fiber() getcontext failed\n");
+        /// å…ˆä¸ç”¨logæ—¥å¿—æ¨¡å—ï¼Œæ€ä¹ˆæ–¹ä¾¿æ€ä¹ˆæ¥
+        printf("%s %s getcontext failed.\n", __FILE__, __FUNCTION__);
         return;
     }
 
     ++s_fiber_count;
     m_id = s_fiber_id++;
-    /// ÏÈ²»ÓÃlogÈÕÖ¾Ä£¿é£¬ÔõÃ´·½±ãÔõÃ´À´
-    printf("Fiber::Fiber() main id = %lu\n", m_id);
+    /// å…ˆä¸ç”¨logæ—¥å¿—æ¨¡å—ï¼Œæ€ä¹ˆæ–¹ä¾¿æ€ä¹ˆæ¥
+    printf("%s %s main id = %lu\n", __FILE__, __FUNCTION__, m_id);
 }
 
 void Fiber::SetThis(Fiber *f){
@@ -80,8 +83,8 @@ Fiber::Fiber(std::function<void()> cb, size_t stacksize, bool run_in_scheduler)
     m_stack = StackAllocator::Alloc(m_stacksize);
 
     if(getcontext(&m_ctx)){
-        /// ÏÈ²»ÓÃlogÈÕÖ¾Ä£¿é£¬ÔõÃ´·½±ãÔõÃ´À´
-        printf("Fiber::Fiber(param in) getcontext failed\n");
+        /// å…ˆä¸ç”¨logæ—¥å¿—æ¨¡å—ï¼Œæ€ä¹ˆæ–¹ä¾¿æ€ä¹ˆæ¥
+        printf("%s %s getcontext failed.\n", __FILE__, __FUNCTION__);
         return;
     }
 
@@ -91,25 +94,25 @@ Fiber::Fiber(std::function<void()> cb, size_t stacksize, bool run_in_scheduler)
 
     makecontext(&m_ctx, &Fiber::MainFunc, 0);
 
-    /// ÏÈ²»ÓÃlogÈÕÖ¾Ä£¿é£¬ÔõÃ´·½±ãÔõÃ´À´
-    printf("Fiber::Fiber(param in) id = %lu\n", m_id);
+    /// å…ˆä¸ç”¨logæ—¥å¿—æ¨¡å—ï¼Œæ€ä¹ˆæ–¹ä¾¿æ€ä¹ˆæ¥
+    printf("%s %s main id = %lu\n", __FILE__, __FUNCTION__, m_id);
 }
 
 /*
- * Ïß³ÌµÄÖ÷Ğ­³ÌÎö¹¹Ê±ĞèÒªÌØÊâ´¦Àí£¬ÒòÎªÖ÷Ğ­³ÌÃ»ÓĞ·ÖÅäÕ»ºÍcb
+ * çº¿ç¨‹çš„ä¸»åç¨‹ææ„æ—¶éœ€è¦ç‰¹æ®Šå¤„ç†ï¼Œå› ä¸ºä¸»åç¨‹æ²¡æœ‰åˆ†é…æ ˆå’Œcb
 */
 Fiber::~Fiber(){
-    printf("Fiber::~Fiber() deconstruct id = %lu\n", m_id);
+    printf("%s %s deconstruct id = %lu\n", __FILE__, __FUNCTION__, m_id);
     --s_fiber_count;
     if(m_stack){
-        // ÓĞÕ»£¬ËµÃ÷ÕâÊÇ×ÓĞ­³Ì£¬ĞèÒªÈ·±£×ÓĞ­³ÌÊÇ½áÊø×´Ì¬²Å¿ÉÒÔÎö¹¹
+        // æœ‰æ ˆï¼Œè¯´æ˜è¿™æ˜¯å­åç¨‹ï¼Œéœ€è¦ç¡®ä¿å­åç¨‹æ˜¯ç»“æŸçŠ¶æ€æ‰å¯ä»¥ææ„
         assert(m_state == TERM);
         StackAllocator::Dealloc(m_stack, m_stacksize);
-        printf("Fiber::~Fiber() dealloc stack, id = %lu\n", m_id);
+        printf("%s %s dealloc stack, id = %lu\n", __FILE__, __FUNCTION__, m_id);
     }
     else{
-        // Ã»ÓĞÕ»£¬ËµÃ÷ÊÇÏß³ÌµÄÖ÷Ğ­³Ì
-        assert(!m_cb && m_state == RUNNING);   // Ã»ÓĞcbºÍ´¦ÓÚÔËĞĞ×´Ì¬
+        // æ²¡æœ‰æ ˆï¼Œè¯´æ˜æ˜¯çº¿ç¨‹çš„ä¸»åç¨‹
+        assert(!m_cb && m_state == RUNNING);   // æ²¡æœ‰cbå’Œå¤„äºè¿è¡ŒçŠ¶æ€
         Fiber *cur = t_fiber;
         if(cur == this){
             SetThis(nullptr);
@@ -118,14 +121,14 @@ Fiber::~Fiber(){
 }
 
 /*
- * ÎªÁË¼ò»¯×´Ì¬£¬Ç¿ÖÆÖ»ÓĞTERM×´Ì¬µÄĞ­³Ì²Å¿ÉÒÔÖØÖÃ£¬Ò²¾ÍÊÇÖ»ÓĞ×ÓĞ­³Ì²Å¿ÉÒÔÖØÖÃ
- * ÖØÖÃĞ­³Ì¾ÍÊÇÖØ¸´ÀûÓÃÒÑ½áÊøµÄĞ­³Ì£¬¸´ÓÃÆäÕ»¿Õ¼ä£¬´´½¨ĞÂĞ­³Ì
+ * ä¸ºäº†ç®€åŒ–çŠ¶æ€ï¼Œå¼ºåˆ¶åªæœ‰TERMçŠ¶æ€çš„åç¨‹æ‰å¯ä»¥é‡ç½®ï¼Œä¹Ÿå°±æ˜¯åªæœ‰å­åç¨‹æ‰å¯ä»¥é‡ç½®
+ * é‡ç½®åç¨‹å°±æ˜¯é‡å¤åˆ©ç”¨å·²ç»“æŸçš„åç¨‹ï¼Œå¤ç”¨å…¶æ ˆç©ºé—´ï¼Œåˆ›å»ºæ–°åç¨‹
 */
 void Fiber::reset(std::function<void()> cb){
-    assert(m_cb && m_state == TERM);   // m_cbÈ·±£Ğ­³ÌÓĞÕ»£¬¼´Ğ­³ÌÊÇ×ÓĞ­³Ì
+    assert(m_cb && m_state == TERM);   // m_cbç¡®ä¿åç¨‹æœ‰æ ˆï¼Œå³åç¨‹æ˜¯å­åç¨‹
     m_cb = cb;
     if(getcontext(&m_ctx)){
-        printf("Fiber::reset(param in) getcontext failed\n");
+        printf("%s %s getcontext failed\n", __FILE__, __FUNCTION__);
         return;
     }
 
@@ -147,16 +150,16 @@ void Fiber::resume(){
     //     return;
     // }
 
-    // Èç¹ûĞ­³Ì²ÎÓëµ÷¶ÈÆ÷µ÷¶È£¬ÄÇÃ´Ó¦¸ÃºÍµ÷¶ÈÆ÷µÄÖ÷Ğ­³Ì½øĞĞswap£¬¶ø²»ÊÇÏß³ÌÖ÷Ğ­³Ì
+    // å¦‚æœåç¨‹å‚ä¸è°ƒåº¦å™¨è°ƒåº¦ï¼Œé‚£ä¹ˆåº”è¯¥å’Œè°ƒåº¦å™¨çš„ä¸»åç¨‹è¿›è¡Œswapï¼Œè€Œä¸æ˜¯çº¿ç¨‹ä¸»åç¨‹
     if(m_runInScheduler){
         if(swapcontext(&(Scheduler::GetMainFiber()->m_ctx), &m_ctx)){
-            printf("Fiber::resume() runInScheduler swapcontext failed\n");
+            printf("%s %s runInScheduler swapcontext failed\n", __FILE__, __FUNCTION__);
             return;
         }
     }
     else{
         if(swapcontext(&(t_thread_fiber->m_ctx), &m_ctx)){
-            printf("Fiber::resume() not runInScheduler swapcontext failed\n");
+            printf("%s %s  not runInScheduler swapcontext failed\n", __FILE__, __FUNCTION__);
             return;
         }
     }
@@ -173,16 +176,16 @@ void Fiber::yield(){
     //     printf("Fiber::yield() swapcontext failed\n");
     //     return;
     // }
-    // Èç¹ûĞ­³Ì²ÎÓëµ÷¶ÈÆ÷µ÷¶È£¬ÄÇÃ´Ó¦¸ÃºÍµ÷¶ÈÆ÷µÄÖ÷Ğ­³Ì½øĞĞswap£¬¶ø²»ÊÇÏß³ÌÖ÷Ğ­³Ì
+    // å¦‚æœåç¨‹å‚ä¸è°ƒåº¦å™¨è°ƒåº¦ï¼Œé‚£ä¹ˆåº”è¯¥å’Œè°ƒåº¦å™¨çš„ä¸»åç¨‹è¿›è¡Œswapï¼Œè€Œä¸æ˜¯çº¿ç¨‹ä¸»åç¨‹
     if(m_runInScheduler){
         if(swapcontext(&m_ctx, &(Scheduler::GetMainFiber()->m_ctx))){
-            printf("Fiber::yield() runInScheduler swapcontext failed\n");
+            printf("%s %s runInScheduler swapcontext failed\n", __FILE__, __FUNCTION__);
             return;
         }
     }
     else{
         if(swapcontext(&m_ctx, &(t_thread_fiber->m_ctx))){
-            printf("Fiber::yield() not runInScheduler swapcontext failed\n");
+            printf("%s %s not runInScheduler swapcontext failed\n", __FILE__, __FUNCTION__);
             return;
         }
     }
